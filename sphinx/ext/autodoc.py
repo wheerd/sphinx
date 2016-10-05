@@ -1281,6 +1281,11 @@ class ClassDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):
                          u':class:`%s`' % b.__name__ or
                          u':class:`%s.%s`' % (b.__module__, b.__name__)
                          for b in self.object.__bases__]
+                result = self.env.app.emit_firstresult(
+                    'autodoc-process-bases', self.objtype, self.fullname,
+                    self.object, self.options, self.object.__bases__)
+                if result is not None:
+                    bases = result
                 self.add_line(u'   ' + _(u'Bases: %s') % ', '.join(bases),
                               sourcename)
 
@@ -1677,6 +1682,7 @@ def setup(app):
     app.add_config_value('autodoc_mock_imports', [], True)
     app.add_event('autodoc-process-docstring')
     app.add_event('autodoc-process-signature')
+    app.add_event('autodoc-process-bases')
     app.add_event('autodoc-skip-member')
 
     return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
