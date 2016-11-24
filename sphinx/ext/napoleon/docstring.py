@@ -19,6 +19,7 @@ from six import string_types, u
 from six.moves import range
 
 from sphinx.ext.napoleon.iterators import modify_iter
+from sphinx.ext.napoleon.typehints import get_type_hints, format_annotation
 from sphinx.util.pycompat import UnicodeMixin
 
 if False:
@@ -126,6 +127,13 @@ class GoogleDocstring(UnicodeMixin):
         self._what = what
         self._name = name
         self._obj = obj
+        if obj is not None:
+            try:
+                self._type_hints = get_type_hints(obj)
+            except AttributeError:
+                self._type_hints = {}
+        else:
+            self._type_hints = {}
         self._opt = options
         if isinstance(docstring, string_types):
             docstring = docstring.splitlines()  # type: ignore
