@@ -727,37 +727,29 @@ class GoogleDocstring(UnicodeMixin):
         use_admonition = self._config.napoleon_use_admonition_for_references
         return self._parse_generic_section('References', use_admonition)
 
-    def _parse_returns_section(self, section):
-        # type: (unicode) -> List[unicode]
+    def _parse_returns_section(self, section, is_yield=False):
+        # type: (unicode, bool) -> List[unicode]
         fields = self._consume_returns_section()
-        multi = len(fields) > 1
-        if multi:
-            use_rtype = False
+
+        use_rtype = len(fields) == 1 and not is_yield and self._config.napoleon_use_rtype
+        field_type = 'Yields' if is_yield else 'returns'
+
+        if use_rtype:
+            filtered_fields = [(name, '', desc) for name, _, desc in fields]
         else:
-            use_rtype = self._config.napoleon_use_rtype
+            filtered_fields = [(name or 'return', t, desc) for name, t, desc in fields]
 
-        lines = []  # type: List[unicode]
-        for _name, _type, _desc in fields:
-            if use_rtype:
-                field = self._format_field(_name, '', _desc)
-            else:
-                field = self._format_field(_name or 'return', _type, _desc)
+        lines = self._format_fields(field_type, filtered_fields)
 
-            if multi:
-                if lines:
-                    lines.extend(self._format_block('          * ', field))
-                else:
-                    lines.extend(self._format_block(':returns: * ', field))
-            else:
-                lines.extend(self._format_block(':returns: ', field))
-                if use_rtype:
-                    if not _type and 'return' in self._type_hints:
-                        return_type = self._type_hints['return']
-                        _type = format_annotation(return_type, self._config, self._obj)
-                    if _type:
-                        lines.extend([':rtype: %s' % _type, ''])
-        if lines and lines[-1]:
-            lines.append('')
+        if use_rtype:
+            _, _type, _ = fields[0]
+            if not _type and 'return' in self._type_hints:
+                return_type = self._type_hints['return']
+                _type = format_annotation(return_type, self._config, self._obj)
+            if _type:
+                lines.pop(-1)
+                lines.extend([':rtype: %s' % _type, ''])
+
         return lines
 
     def _parse_see_also_section(self, section):
@@ -781,8 +773,7 @@ class GoogleDocstring(UnicodeMixin):
 
     def _parse_yields_section(self, section):
         # type: (unicode) -> List[unicode]
-        fields = self._consume_returns_section()
-        return self._format_fields('Yields', fields)
+        return self._parse_returns_section(section, True)
 
     def _partition_field_on_colon(self, line):
         # type: (unicode) -> Tuple[unicode, unicode, unicode]
