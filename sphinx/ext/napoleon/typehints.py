@@ -18,7 +18,7 @@ try:
 
     get_type_hints = typing.get_type_hints
 
-    def format_annotation(annotation, obj=None, link=True):
+    def format_annotation(annotation, config, obj=None):
         """Return the type annotation formatted in a reStructuredText format.
 
         Parameters
@@ -48,7 +48,7 @@ try:
             if annotation.__module__ in ('builtins', '__builtin__'):
                 if qualname == 'NoneType':
                     return '``None``'
-                elif link:
+                elif config.napoleon_link_types:
                     return ':class:`{}`'.format(qualname)
                 else:
                     return qualname
@@ -102,7 +102,7 @@ try:
                         if annotation.__args__ is Ellipsis:
                             args_value = Ellipsis
                         else:
-                            args_value = '\\[{}]'.format(', '.join(format_annotation(a, obj, link)
+                            args_value = '\\[{}]'.format(', '.join(format_annotation(a, config, obj)
                                                                    for a in annotation.__args__))
                         params = [args_value, annotation.__result__]
                 # Type variables are formatted with a prefix character (~, +, -)
@@ -118,20 +118,24 @@ try:
                             global_vars = dict()
                         # Evaluate the type annotation string and then format it
                         actual_type = eval(annotation.__forward_arg__, global_vars)
-                        return format_annotation(actual_type, obj, link)
+                        return format_annotation(actual_type, config, obj)
                     except Exception:
                         return annotation.__forward_arg__
 
-            generic = '\\[{}]'.format(', '.join(format_annotation(p, obj, link)
+            generic = '\\[{}]'.format(', '.join(format_annotation(p, config, obj)
                                                 for p in params)) if params else ''
-            format_str = ':{}:`~{}.{}`{}' if link else '{1}.{2}{3}'
-            return format_str.format(role, annotation.__module__, qualname, generic)
+            full_name = '{}.{}'.format(annotation.__module__, qualname)
+            link = _make_link(full_name, config, role)
+
+            return link + generic
         # _TypeAlias is an internal class used for the Pattern/Match types
         # It represents an alias for another type, e.g. Pattern is an alias for any string type
         elif isinstance(annotation, typing._TypeAlias):
-            actual_type = format_annotation(annotation.type_var, obj, link)
-            format_str = ':class:`~typing.{}`\\[{}]' if link else 'typing.{}\\[{}]'
-            return format_str.format(annotation.name, actual_type)
+            actual_type = format_annotation(annotation.type_var, config, obj)
+            full_name = 'typing.{}'.format(annotation.name)
+            link = _make_link(full_name, config, 'class')
+
+            return '{}\\[{}]'.format(link, actual_type)
         # Ellipsis is used in Callable/Tuple
         elif annotation is Ellipsis:
             return '...'
@@ -144,7 +148,7 @@ except ImportError:
         """Dummy replacement that returns an empty type hint dictionary."""
         return {}
 
-    def format_annotation(annotation, obj=None, link=True):
+    def format_annotation(annotation, config, obj=None):
         if inspect.isclass(annotation):
             try:
                 qualname = annotation.__qualname__
@@ -155,14 +159,40 @@ except ImportError:
             if annotation.__module__ in ('builtins', '__builtin__'):
                 if qualname == 'NoneType':
                     return '``None``'
-                elif link:
+                elif config.napoleon_link_types:
                     return ':class:`{}`'.format(qualname)
                 else:
                     return qualname
 
-            format_str = ':obj:`~{}.{}`' if link else '{}.{}'
-            return format_str.format(annotation.__module__, qualname)
+            full_name = '{}.{}'.format(annotation.__module__, qualname)
+
+            return _make_link(full_name, config)
 
         return str(annotation)
 
-__all__ = ['get_type_hints']
+def _make_link(full_name, config, role='obj'):
+    if config.napoleon_link_types:
+        if config.napoleon_always_shorten:
+            link_name = '~{}'.format(full_name)
+        else:
+            link_name = _shorten_type_name(full_name, config.napoleon_shorten_prefixes)
+
+        return ':{}:`{}`'.format(role, link_name)
+
+    return full_name
+
+def _shorten_type_name(name, prefixes):
+    short_name = None
+    for prefix in prefixes:
+        if name.startswith(prefix):
+            if prefix.endswith('.'):
+                short_name = name[len(prefix):]
+                if '.' not in short_name:
+                    short_name = None
+            if short_name:
+                return '{} <{}>'.format(short_name, name)
+            return '~{}'.format(name)
+    return name
+
+
+__all__ = ['get_type_hints', 'format_annotation']

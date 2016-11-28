@@ -14,6 +14,7 @@
 import collections
 import inspect
 import re
+import sys
 
 from six import string_types, u
 from six.moves import range
@@ -132,6 +133,12 @@ class GoogleDocstring(UnicodeMixin):
                 self._type_hints = get_type_hints(obj)
             except AttributeError:
                 self._type_hints = {}
+            if what == 'class' or what == 'exception' or what == 'attribute':
+                if hasattr(obj, '__init__'):
+                    try:
+                        self._type_hints.update(get_type_hints(obj.__init__))
+                    except AttributeError:
+                        pass
         else:
             self._type_hints = {}
         self._opt = options
@@ -386,6 +393,10 @@ class GoogleDocstring(UnicodeMixin):
             else:
                 lines.append(':%s %s:' % (field_role, _name))
 
+            if not _type and _name in self._type_hints:
+                _type = format_annotation(self._type_hints[_name], self._config, self._obj)
+            elif _type:
+                _type = self._eval_type(_type)
             if _type:
                 lines.append(':%s %s: %s' % (type_role, _name, _type))
         return lines + ['']
@@ -395,7 +406,11 @@ class GoogleDocstring(UnicodeMixin):
         _desc = self._strip_empty(_desc)
         has_desc = any(_desc)
         separator = has_desc and ' -- ' or ''
-        if _name:
+        if not _type and _name in self._type_hints:
+            _type = format_annotation(self._type_hints[_name], self._config, self._obj)
+        elif _type:
+            _type = self._eval_type(_type)
+        if _name and _name != 'return':
             if _type:
                 if '`' in _type:
                     field = '**%s** (%s)%s' % (_name, _type, separator)  # type: unicode
@@ -574,12 +589,29 @@ class GoogleDocstring(UnicodeMixin):
                     lines.append(':vartype %s: %s' % (_name, _type))
             else:
                 lines.extend(['.. attribute:: ' + _name, ''])
-                field = self._format_field('', _type, _desc)  # type: ignore
+                field = self._format_field('', self._eval_type(_type), _desc)  # type: ignore
                 lines.extend(self._indent(field, 3))  # type: ignore
                 lines.append('')
         if self._config.napoleon_use_ivar:
             lines.append('')
         return lines
+
+    def _eval_type(self, _type):
+        if _type and not '`' in _type and self._config.napoleon_parse_docstring_types:
+            try:
+                if hasattr(self._obj, '__module__'):
+                    global_ns = sys.modules[self._obj.__module__].__dict__
+                else:
+                    global_ns = {}
+                type_hint = eval(_type, global_ns)
+
+                return format_annotation(type_hint, self._config, self._obj)
+
+            except Exception as e:
+                self._app.warn("Failed to parse type {!r} in docstring of {} {}: {}."
+                               .format(_type, self._what, self._name, e))
+
+        return _type
 
     def _parse_examples_section(self, section):
         # type: (unicode) -> List[unicode]
@@ -709,7 +741,7 @@ class GoogleDocstring(UnicodeMixin):
             if use_rtype:
                 field = self._format_field(_name, '', _desc)
             else:
-                field = self._format_field(_name, _type, _desc)
+                field = self._format_field(_name or 'return', _type, _desc)
 
             if multi:
                 if lines:
@@ -718,8 +750,12 @@ class GoogleDocstring(UnicodeMixin):
                     lines.extend(self._format_block(':returns: * ', field))
             else:
                 lines.extend(self._format_block(':returns: ', field))
-                if _type and use_rtype:
-                    lines.extend([':rtype: %s' % _type, ''])
+                if use_rtype:
+                    if not _type and 'return' in self._type_hints:
+                        return_type = self._type_hints['return']
+                        _type = format_annotation(return_type, self._config, self._obj)
+                    if _type:
+                        lines.extend([':rtype: %s' % _type, ''])
         if lines and lines[-1]:
             lines.append('')
         return lines

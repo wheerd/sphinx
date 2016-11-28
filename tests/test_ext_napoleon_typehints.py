@@ -14,6 +14,7 @@ from unittest import TestCase
 from typing import (Any, Callable, Dict, Generic, Mapping, Optional, Pattern,
                     Tuple, Type, TypeVar, Union)
 
+from sphinx.ext.napoleon import Config
 from sphinx.ext.napoleon.typehints import format_annotation
 
 T = TypeVar('T')
@@ -85,5 +86,7 @@ ANNOTATION_EXAMPLES = [
 
 class FormatAnnotationTest(TestCase):
     def test_format_with_link(self):
+        config = Config(napoleon_always_shorten=True)
+
         for annotation, result in ANNOTATION_EXAMPLES:
-            self.assertEqual(result, format_annotation(annotation))
+            self.assertEqual(result, format_annotation(annotation, config))

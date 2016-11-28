@@ -255,7 +255,11 @@ class Config(object):
         'napoleon_use_ivar': (False, 'env'),
         'napoleon_use_param': (True, 'env'),
         'napoleon_use_rtype': (True, 'env'),
-        'napoleon_use_keyword': (True, 'env')
+        'napoleon_use_keyword': (True, 'env'),
+        'napoleon_shorten_prefixes': ((), 'env'),
+        'napoleon_link_types': (True, 'env'),
+        'napoleon_always_shorten': (False, 'env'),
+        'napoleon_parse_docstring_types': (False, 'env')
     }
 
     def __init__(self, **settings):
