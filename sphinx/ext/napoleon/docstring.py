@@ -16,12 +16,29 @@ import inspect
 import re
 import sys
 
+try:
+    import typing
+
+    _iterator_types = []
+    if hasattr(typing, 'Generator'):
+        _iterator_types.append(typing.Generator)
+    if hasattr(typing, 'Iterator'):
+        _iterator_types.append(typing.Iterator)
+    if hasattr(typing, 'Iterable'):
+        _iterator_types.append(typing.Iterable)
+    _iterator_types = tuple(_iterator_types)
+
+except ImportError:
+    typing = None
+    _iterator_types = None
+
 from six import string_types, u
 from six.moves import range
 
 from sphinx.ext.napoleon.iterators import modify_iter
 from sphinx.ext.napoleon.typehints import get_type_hints, format_annotation
 from sphinx.util.pycompat import UnicodeMixin
+
 
 if False:
     # For type annotation
@@ -393,21 +410,34 @@ class GoogleDocstring(UnicodeMixin):
             else:
                 lines.append(':%s %s:' % (field_role, _name))
 
-            if not _type and _name in self._type_hints:
-                _type = format_annotation(self._type_hints[_name], self._config, self._obj)
+            param_name = re.sub(r'^(\\?\*)+', '', _name)
+            if not _type and param_name in self._type_hints:
+                _type = format_annotation(self._type_hints[param_name], self._config, self._obj)
             elif _type:
                 _type = self._eval_type(_type)
             if _type:
                 lines.append(':%s %s: %s' % (type_role, _name, _type))
         return lines + ['']
 
+    @staticmethod
+    def _is_iterator(type_hint):
+        return _iterator_types \
+                and isinstance(type_hint, type) \
+                and issubclass(type_hint, _iterator_types)
+
     def _format_field(self, _name, _type, _desc):
         # type: (unicode, unicode, List[unicode]) -> List[unicode]
         _desc = self._strip_empty(_desc)
         has_desc = any(_desc)
         separator = has_desc and ' -- ' or ''
-        if not _type and _name in self._type_hints:
-            _type = format_annotation(self._type_hints[_name], self._config, self._obj)
+
+        param_name = re.sub(r'^(\\?\*)+', '', _name)
+        if not _type and param_name in self._type_hints:
+            type_hint = self._type_hints[param_name]
+            if _name == 'return' and self._is_iterator(type_hint):
+                if type_hint.__args__ and len(type_hint.__args__) > 0:
+                    type_hint = type_hint.__args__[0]
+            _type = format_annotation(type_hint, self._config, self._obj)
         elif _type:
             _type = self._eval_type(_type)
         if _name and _name != 'return':
