@@ -42,8 +42,11 @@ os.environ['SPHINX_TEST_TEMPDIR'] = \
 tempdir = path(os.environ['SPHINX_TEST_TEMPDIR'])
 print('Temporary files will be placed in %s.' % tempdir)
 if tempdir.exists():
-    tempdir.rmtree()
-tempdir.makedirs()
+    tempdir.rmtree(ignore_errors=True)
+try:
+    tempdir.makedirs()
+except FileExistsError:
+    pass
 
 print('Running Sphinx test suite (with Python %s)...' % sys.version.split()[0])
 sys.stdout.flush()

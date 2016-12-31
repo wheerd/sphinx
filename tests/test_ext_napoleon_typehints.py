@@ -77,7 +77,7 @@ ANNOTATION_EXAMPLES = [
     (A,                             ':class:`~%s.A`' % __name__),
     (B,                             ':class:`~%s.B`\\[\\~T]' % __name__),
     (C,                             ':class:`~%s.C`\\[\\~T]' % __name__),
-    (Type,                          ':class:`~typing.Type`\\[\\+CT]'),
+    (Type,                          ':class:`~typing.Type`\\[\\%s]' % str(Type.__parameters__[0])),
     (Type[A],                       ':class:`~typing.Type`\\[:class:`~%s.A`]' % __name__),
     (Type['A'],                     ':class:`~typing.Type`\\[A]'),
     (Type['str'],                   ':class:`~typing.Type`\\[:class:`str`]'),
